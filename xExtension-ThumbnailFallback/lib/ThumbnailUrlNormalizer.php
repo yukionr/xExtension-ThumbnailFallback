@@ -6,6 +6,36 @@ namespace ThumbnailFallback;
 
 final class ThumbnailUrlNormalizer
 {
+	public static function firstOgImageUrl(string $html, string $baseUrl): ?string
+	{
+		if (!self::isHttpUrl($baseUrl)) {
+			return null;
+		}
+
+		if (preg_match_all('~<meta\b[^>]*>~is', $html, $matches) === false) {
+			return null;
+		}
+
+		foreach ($matches[0] as $tag) {
+			$property = self::attributeValue($tag, 'property') ?? self::attributeValue($tag, 'name');
+			if ($property === null || strtolower(trim($property)) !== 'og:image') {
+				continue;
+			}
+
+			$content = self::attributeValue($tag, 'content');
+			if ($content === null) {
+				continue;
+			}
+
+			$url = self::resolveUrl(html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8'), $baseUrl);
+			if (self::isHttpUrl($url)) {
+				return $url;
+			}
+		}
+
+		return null;
+	}
+
 	public static function firstImageUrl(string $html, string $baseUrl): ?string
 	{
 		if (!self::isHttpUrl($baseUrl)) {
@@ -113,6 +143,12 @@ final class ThumbnailUrlNormalizer
 		}
 
 		return $origin . self::normalizePath($path) . $query . $fragment;
+	}
+
+	private static function attributeValue(string $tag, string $attribute): ?string
+	{
+		$pattern = '~\s' . preg_quote($attribute, '~') . '\s*=\s*(["\'])(.*?)\1~is';
+		return preg_match($pattern, $tag, $matches) === 1 ? $matches[2] : null;
 	}
 
 	private static function normalizePath(string $path): string

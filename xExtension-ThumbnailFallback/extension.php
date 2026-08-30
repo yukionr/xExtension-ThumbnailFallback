@@ -31,11 +31,27 @@ final class ThumbnailFallbackExtension extends Minz_Extension
 
 		if ($entry->thumbnail() === null) {
 			$thumbnailUrl = ThumbnailUrlNormalizer::firstImageUrl($normalizedContent, $link);
+			if ($thumbnailUrl === null) {
+				$thumbnailUrl = $this->firstOgImageUrl($link);
+			}
 			if ($thumbnailUrl !== null) {
 				$entry->_attribute('thumbnail', ['url' => $thumbnailUrl]);
 			}
 		}
 
 		return $entry;
+	}
+
+	private function firstOgImageUrl(string $link): ?string
+	{
+		$response = FreshRSS_http_Util::httpGet($link, null, 'html', ['timeout' => 3]);
+		if (($response['fail'] ?? true) || !is_string($response['body'] ?? null)) {
+			return null;
+		}
+
+		$baseUrl = is_string($response['effective_url'] ?? null) && $response['effective_url'] !== ''
+			? $response['effective_url']
+			: $link;
+		return ThumbnailUrlNormalizer::firstOgImageUrl($response['body'], $baseUrl);
 	}
 }

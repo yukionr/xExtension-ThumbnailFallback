@@ -70,6 +70,25 @@ class Minz_Extension
 	}
 }
 
+final class FreshRSS_http_Util
+{
+	public static int $calls = 0;
+
+	/** @return array{body:string,effective_url:string,redirect_count:int,fail:bool,status:int,error:string} */
+	public static function httpGet(string $url, ?string $cachePath = null, string $type = 'html', array $attributes = []): array
+	{
+		self::$calls++;
+		return [
+			'body' => '<meta property="og:image" content="/article-image.jpg">',
+			'effective_url' => $url,
+			'redirect_count' => 0,
+			'fail' => false,
+			'status' => 200,
+			'error' => '',
+		];
+	}
+}
+
 final class FreshRSS_Entry
 {
 	/** @var array<string,mixed> */
@@ -146,6 +165,18 @@ $entryWithThumbnail = new FreshRSS_Entry(
 $extension->normalizeEntry($entryWithThumbnail);
 if ($entryWithThumbnail->thumbnail() !== ['url' => 'https://cdn.example.test/provided-image.jpg']) {
 	throw new RuntimeException('既存の FreshRSS サムネイル属性を上書きする');
+}
+
+$entryWithOgImage = new FreshRSS_Entry(
+	'https://publisher.example.test/2026/08/article-without-body-image.html',
+	'<p>本文に画像を含まない記事</p>',
+);
+$extension->normalizeEntry($entryWithOgImage);
+if ($entryWithOgImage->thumbnail() !== ['url' => 'https://publisher.example.test/article-image.jpg']) {
+	throw new RuntimeException('本文画像がない記事の og:image をサムネイル属性へ設定する');
+}
+if (FreshRSS_http_Util::$calls !== 1) {
+	throw new RuntimeException('サムネイルがない記事だけ記事ページを取得する');
 }
 
 echo "ok\n";
