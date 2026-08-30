@@ -1,0 +1,8 @@
+{
+  "name": "Thumbnail URL Fallback",
+  "author": "wonder2",
+  "description": "Normalize relative image URLs in RSS article content for thumbnail display.",
+  "version": "0.1.0",
+  "entrypoint": "ThumbnailFallback",
+  "type": "system"
+}

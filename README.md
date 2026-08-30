@@ -1,0 +1,43 @@
+# FreshRSS Thumbnail Fallback
+
+FreshRSS の通常表示で、RSS 本文に含まれる相対画像 URL を記事 URL 基準の
+絶対 URL へ補正する拡張です。
+
+## 背景
+
+あるメディアの RSS は絶対 URL の `<img src>` を含みますが、別のメディアの
+RSS は `content:encoded` 内に `/wp-content/...` のような相対 URL を含みます。
+FreshRSS の表示元と記事サイトの origin が異なるため、相対 URL のままでは
+サムネイルが読み込めません。
+
+## 方針
+
+- FreshRSS 本体を fork しない
+- 画像本体をダウンロード・キャッシュしない
+- 絶対 URL は変更しない
+- `data:`、`blob:`、`mailto:` など外部画像ではない URL は変更しない
+- 新規記事だけでなく、表示時にも補正して既存記事へ適用する
+
+## 対応範囲
+
+初版は、記事本文の `<img src>` と `<img srcset>` の URL 補正に限定します。
+記事ページの `og:image` を追加取得する機能は、外部サイトへの追加アクセスと
+取得負荷を伴うため、別の検討事項とします。
+
+## FreshRSS への配置
+
+`xExtension-ThumbnailFallback/` を FreshRSS の `extensions/` 配下へ配置し、
+FreshRSS の **設定 → 拡張機能** から有効化します。
+
+このリポジトリを Kubernetes から利用する場合は、リポジトリの commit と
+アーカイブ SHA-256 を固定して extension directory を配置してください。
+
+## 開発
+
+```sh
+php tests/run.php
+php -l xExtension-ThumbnailFallback/extension.php
+php -l xExtension-ThumbnailFallback/lib/ThumbnailUrlNormalizer.php
+```
+
+ライセンス: GNU Affero General Public License v3.0 以降
