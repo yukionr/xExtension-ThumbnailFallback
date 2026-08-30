@@ -6,6 +6,20 @@ namespace ThumbnailFallback;
 
 final class ThumbnailUrlNormalizer
 {
+	public static function firstImageUrl(string $html, string $baseUrl): ?string
+	{
+		if (!self::isHttpUrl($baseUrl)) {
+			return null;
+		}
+
+		if (preg_match('~<img\b[^>]*\bsrc\s*=\s*(["\'])(.*?)\1~is', $html, $matches) !== 1) {
+			return null;
+		}
+
+		$url = self::resolveUrl($matches[2], $baseUrl);
+		return self::isHttpUrl($url) ? $url : null;
+	}
+
 	public static function normalizeHtml(string $html, string $baseUrl): string
 	{
 		if (!self::isHttpUrl($baseUrl)) {

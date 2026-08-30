@@ -26,7 +26,16 @@ final class ThumbnailFallbackExtension extends Minz_Extension
 			return $entry;
 		}
 
-		$entry->_content(ThumbnailUrlNormalizer::normalizeHtml($content, $link));
+		$normalizedContent = ThumbnailUrlNormalizer::normalizeHtml($content, $link);
+		$entry->_content($normalizedContent);
+
+		if ($entry->thumbnail() === null) {
+			$thumbnailUrl = ThumbnailUrlNormalizer::firstImageUrl($normalizedContent, $link);
+			if ($thumbnailUrl !== null) {
+				$entry->_attribute('thumbnail', ['url' => $thumbnailUrl]);
+			}
+		}
+
 		return $entry;
 	}
 }

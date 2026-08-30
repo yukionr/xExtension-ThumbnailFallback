@@ -72,8 +72,14 @@ class Minz_Extension
 
 final class FreshRSS_Entry
 {
-	public function __construct(private string $link, private string $content)
+	/** @var array<string,mixed> */
+	private array $attributes = [];
+
+	public function __construct(private string $link, private string $content, ?array $thumbnail = null)
 	{
+		if ($thumbnail !== null) {
+			$this->attributes['thumbnail'] = $thumbnail;
+		}
 	}
 
 	public function link(): string
@@ -89,6 +95,21 @@ final class FreshRSS_Entry
 	public function _content(string $content): void
 	{
 		$this->content = $content;
+	}
+
+	public function thumbnail(): ?array
+	{
+		$thumbnail = $this->attributes['thumbnail'] ?? null;
+		return is_array($thumbnail) ? $thumbnail : null;
+	}
+
+	public function _attribute(string $key, $value = null): void
+	{
+		if ($value === null) {
+			unset($this->attributes[$key]);
+			return;
+		}
+		$this->attributes[$key] = $value;
 	}
 }
 
@@ -110,5 +131,21 @@ assertSameValue(
 	$entry->content(),
 	'FreshRSS entry hook が記事本文を補正する',
 );
+$thumbnail = $entry->thumbnail();
+if ($thumbnail !== ['url' => 'https://publisher.example.test/wp-content/uploads/2026/08/article-image.jpg']) {
+	throw new RuntimeException(
+		"FreshRSS entry hook が本文先頭画像をサムネイル属性へ設定する\nactual: " . var_export($thumbnail, true),
+	);
+}
+
+$entryWithThumbnail = new FreshRSS_Entry(
+	'https://publisher.example.test/2026/08/article.html',
+	'<img src="/article-image.jpg">',
+	['url' => 'https://cdn.example.test/provided-image.jpg'],
+);
+$extension->normalizeEntry($entryWithThumbnail);
+if ($entryWithThumbnail->thumbnail() !== ['url' => 'https://cdn.example.test/provided-image.jpg']) {
+	throw new RuntimeException('既存の FreshRSS サムネイル属性を上書きする');
+}
 
 echo "ok\n";
