@@ -1,49 +1,98 @@
 # FreshRSS Thumbnail Fallback
 
-FreshRSS の通常表示で、RSS 本文に含まれる相対画像 URL を記事 URL 基準の
-絶対 URL へ補正し、フィード由来のサムネイルがない記事では本文先頭画像を
-一覧用サムネイルとして設定します。本文にも画像がない場合は、記事ページの
-`og:image` を URL のみ取得して一覧用サムネイルへ設定します。
+A FreshRSS extension that resolves relative image URLs in article content and
+fills missing thumbnails from content images or Open Graph metadata.
 
-## 背景
+Some feeds include image paths such as `/images/cover.jpg` instead of absolute
+URLs. When FreshRSS and the publisher use different origins, those images can
+point to the wrong server. This extension resolves them against the article URL
+without modifying FreshRSS itself.
 
-あるメディアの RSS は絶対 URL の `<img src>` を含みますが、別のメディアの
-RSS は `content:encoded` 内に `/wp-content/...` のような相対 URL を含みます。
-FreshRSS の表示元と記事サイトの origin が異なるため、相対 URL のままでは
-サムネイルが読み込めません。
+## Installation
 
-## 方針
+1. Download or clone this repository.
+2. Copy `xExtension-ThumbnailFallback/` into your FreshRSS `extensions/` directory.
+3. Enable **Thumbnail URL Fallback** in FreshRSS under **Settings → Extensions**.
 
-- FreshRSS 本体を fork しない
-- 画像本体をダウンロード・キャッシュしない
-- 絶対 URL は変更しない
-- `data:`、`blob:`、`mailto:` など外部画像ではない URL は変更しない
-- 新規記事だけでなく、表示時にも補正して既存記事へ適用する
-- 記事ページから取得するのは HTML メタデータで、画像本体は保存しない
+The resulting directory layout should be:
 
-## 対応範囲
+```text
+FreshRSS/
+└── extensions/
+    └── xExtension-ThumbnailFallback/
+        ├── extension.php
+        ├── metadata.json
+        └── lib/
+            └── ThumbnailUrlNormalizer.php
+```
 
-記事本文の `<img src>` と `<img srcset>` の URL 補正に対応します。FreshRSS が
-フィードからサムネイルを取得できなかった場合は、本文先頭の HTTP(S) 画像を
-`thumbnail.url` 属性へ設定します。既存のサムネイル属性や enclosure の画像は
-上書きしません。本文画像もない場合だけ、記事ページを最大3秒の timeout で
-取得し、`og:image` の HTTP(S) URL を補完します。記事ページの取得に失敗した
-場合は記事表示を妨げず、サムネイルも設定しません。
+The extension uses FreshRSS's `EntryBeforeDisplay`, `EntryBeforeInsert`, and
+`EntryBeforeUpdate` hooks and `FreshRSS_http_Util::httpGet()` API. Compatibility
+with specific FreshRSS releases is not established by the standalone tests.
 
-## FreshRSS への配置
+For automated deployments, including Kubernetes, pin the repository commit and
+verify the archive's SHA-256 before copying the extension directory.
 
-`xExtension-ThumbnailFallback/` を FreshRSS の `extensions/` 配下へ配置し、
-FreshRSS の **設定 → 拡張機能** から有効化します。
+## How it works
 
-このリポジトリを Kubernetes から利用する場合は、リポジトリの commit と
-アーカイブ SHA-256 を固定して extension directory を配置してください。
+On article insertion, update, and display, the extension:
 
-## 開発
+1. Resolves relative URLs in quoted `src` and `srcset` attributes on `<img>` and
+   `<source>` elements against the article URL.
+2. Preserves any thumbnail already returned by FreshRSS, including images from
+   feed enclosures.
+3. If no thumbnail exists, uses the first `<img>` element with a quoted `src`
+   when its resolved URL is HTTP(S).
+4. If that produces no usable URL, fetches the article page with a three-second
+   timeout and uses the first usable HTTP(S) `og:image` URL. Relative metadata
+   URLs are resolved against the final article URL after redirects.
+
+For example, an article at `https://publisher.example/articles/story.html` with
+`<img src="../images/cover.jpg">` becomes
+`<img src="https://publisher.example/images/cover.jpg">`.
+
+Absolute URLs are preserved. URL schemes such as `data:`, `blob:`, and `mailto:`
+are left unchanged and are not selected as thumbnail URLs. Display hooks also
+apply the fallback to existing articles; reimporting the feed is unnecessary.
+
+### Limits and network behavior
+
+- The extension stores thumbnail URLs, not image files. It does not download or
+  cache image files itself; images are loaded through FreshRSS's normal display
+  behavior.
+- Open Graph fallback makes a server-side request to the article page. Failed
+  HTTP responses leave the thumbnail unset. Entries that still lack a thumbnail
+  can trigger another request on a later display or update; this extension does
+  not provide a metadata cache.
+- HTML matching uses regular expressions and expects quoted attributes. It is
+  not a full HTML parser or browser URL resolver; complex markup, `srcset` URLs
+  containing commas, CSS backgrounds, and `<base>` elements are not supported
+  comprehensively.
+- Content fallback examines the first matching `<img src>` only. It does not
+  search later images if that URL is unusable, or select thumbnails from
+  `srcset` alone.
+
+## Development
+
+With PHP available, run these commands from the repository root:
 
 ```sh
 php tests/run.php
+php -l tests/run.php
 php -l xExtension-ThumbnailFallback/extension.php
 php -l xExtension-ThumbnailFallback/lib/ThumbnailUrlNormalizer.php
 ```
 
-ライセンス: GNU Affero General Public License v3.0 以降
+The standalone test runner prints `ok` on success. It covers relative URLs,
+`srcset`, preservation of absolute and data URLs, hook registration, content
+thumbnails, existing thumbnails, and Open Graph fallback. FreshRSS classes and
+HTTP responses are stubbed; the suite does not verify a live FreshRSS instance
+or real network requests.
+
+See [Contributing](CONTRIBUTING.md) for reporting issues and submitting changes.
+Repository maintainers can find the proposed GitHub description and topics in
+[GitHub About](docs/github-about.md).
+
+## License
+
+[GNU Affero General Public License v3.0 or later](LICENSE).

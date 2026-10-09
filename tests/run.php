@@ -19,7 +19,7 @@ assertSameValue(
 		'<p><img src="/wp-content/uploads/2026/08/article-image.jpg"></p>',
 		'https://news.example.test/2026/08/article.html',
 	),
-	'相対 src を記事 origin 基準で補正する',
+	'Resolve relative src URLs against the article origin',
 );
 
 assertSameValue(
@@ -28,7 +28,7 @@ assertSameValue(
 		'<img src="https://cdn.example.test/articles/article-image.jpg">',
 		'https://publisher.example.test/articles/123',
 	),
-	'絶対 URL は変更しない',
+	'Preserve absolute URLs',
 );
 
 assertSameValue(
@@ -37,7 +37,7 @@ assertSameValue(
 		'<img src="../images/cover.jpg" srcset="../images/small.jpg 1x, https://cdn.example.test/large.jpg 2x">',
 		'https://publisher.example.test/2026/08/article.html',
 	),
-	'srcset の相対 URL も補正する',
+	'Resolve relative URLs in srcset',
 );
 
 assertSameValue(
@@ -46,7 +46,7 @@ assertSameValue(
 		'<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP">',
 		'https://publisher.example.test/2026/08/article.html',
 	),
-	'埋め込みデータ URL は変更しない',
+	'Preserve embedded data URLs',
 );
 
 final class Minz_HookType
@@ -137,7 +137,7 @@ require_once __DIR__ . '/../xExtension-ThumbnailFallback/extension.php';
 $extension = new ThumbnailFallbackExtension();
 $extension->init();
 if (count($extension->registeredHooks) !== 3) {
-	throw new RuntimeException('FreshRSS の3つの entry hook が登録されていない');
+	throw new RuntimeException('Expected all three FreshRSS entry hooks to be registered');
 }
 
 $entry = new FreshRSS_Entry(
@@ -148,12 +148,12 @@ $extension->normalizeEntry($entry);
 assertSameValue(
 	'<img src="https://publisher.example.test/wp-content/uploads/2026/08/article-image.jpg">',
 	$entry->content(),
-	'FreshRSS entry hook が記事本文を補正する',
+	'Normalize article content through the FreshRSS entry hook',
 );
 $thumbnail = $entry->thumbnail();
 if ($thumbnail !== ['url' => 'https://publisher.example.test/wp-content/uploads/2026/08/article-image.jpg']) {
 	throw new RuntimeException(
-		"FreshRSS entry hook が本文先頭画像をサムネイル属性へ設定する\nactual: " . var_export($thumbnail, true),
+		"Expected the FreshRSS entry hook to set the first content image as the thumbnail\nactual: " . var_export($thumbnail, true),
 	);
 }
 
@@ -164,19 +164,19 @@ $entryWithThumbnail = new FreshRSS_Entry(
 );
 $extension->normalizeEntry($entryWithThumbnail);
 if ($entryWithThumbnail->thumbnail() !== ['url' => 'https://cdn.example.test/provided-image.jpg']) {
-	throw new RuntimeException('既存の FreshRSS サムネイル属性を上書きする');
+	throw new RuntimeException('Expected the existing FreshRSS thumbnail to remain unchanged');
 }
 
 $entryWithOgImage = new FreshRSS_Entry(
 	'https://publisher.example.test/2026/08/article-without-body-image.html',
-	'<p>本文に画像を含まない記事</p>',
+	'<p>An article without content images</p>',
 );
 $extension->normalizeEntry($entryWithOgImage);
 if ($entryWithOgImage->thumbnail() !== ['url' => 'https://publisher.example.test/article-image.jpg']) {
-	throw new RuntimeException('本文画像がない記事の og:image をサムネイル属性へ設定する');
+	throw new RuntimeException('Expected og:image to provide the thumbnail when content has no image');
 }
 if (FreshRSS_http_Util::$calls !== 1) {
-	throw new RuntimeException('サムネイルがない記事だけ記事ページを取得する');
+	throw new RuntimeException('Expected article pages to be fetched only when a thumbnail is missing');
 }
 
 echo "ok\n";
