@@ -90,8 +90,6 @@ HTTP responses are stubbed; the suite does not verify a live FreshRSS instance
 or real network requests.
 
 See [Contributing](CONTRIBUTING.md) for reporting issues and submitting changes.
-Repository maintainers can find the proposed GitHub description and topics in
-[GitHub About](docs/github-about.md).
 
 ## License
 
