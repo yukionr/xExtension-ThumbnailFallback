@@ -10,25 +10,14 @@ without modifying FreshRSS itself.
 
 ## Installation
 
+The extension requires FreshRSS's `EntryBeforeDisplay`, `EntryBeforeInsert`, and
+`EntryBeforeUpdate` hooks and `FreshRSS_http_Util::httpGet()` API. The standalone
+tests do not establish compatibility with specific FreshRSS releases.
+
 1. Download or clone this repository.
-2. Copy `xExtension-ThumbnailFallback/` into your FreshRSS `extensions/` directory.
+2. Copy the entire `xExtension-ThumbnailFallback/` directory, including `lib/`,
+   into your FreshRSS `extensions/` directory.
 3. Enable **Thumbnail URL Fallback** in FreshRSS under **Settings → Extensions**.
-
-The resulting directory layout should be:
-
-```text
-FreshRSS/
-└── extensions/
-    └── xExtension-ThumbnailFallback/
-        ├── extension.php
-        ├── metadata.json
-        └── lib/
-            └── ThumbnailUrlNormalizer.php
-```
-
-The extension uses FreshRSS's `EntryBeforeDisplay`, `EntryBeforeInsert`, and
-`EntryBeforeUpdate` hooks and `FreshRSS_http_Util::httpGet()` API. Compatibility
-with specific FreshRSS releases is not established by the standalone tests.
 
 For automated deployments, including Kubernetes, pin the repository commit and
 verify the archive's SHA-256 before copying the extension directory.
@@ -51,9 +40,13 @@ For example, an article at `https://publisher.example/articles/story.html` with
 `<img src="../images/cover.jpg">` becomes
 `<img src="https://publisher.example/images/cover.jpg">`.
 
-Absolute URLs are preserved. URL schemes such as `data:`, `blob:`, and `mailto:`
-are left unchanged and are not selected as thumbnail URLs. Display hooks also
-apply the fallback to existing articles; reimporting the feed is unnecessary.
+Content URL resolution requires an HTTP(S) article URL. URLs starting with `//`
+inherit its scheme; absolute URLs keep their scheme and host. Non-HTTP(S) URLs,
+such as `data:`, `blob:`, and `mailto:`, are not selected as thumbnails. See the
+`srcset` parsing limits below for URLs containing commas.
+
+Display hooks also apply the fallback to existing articles; reimporting the feed
+is unnecessary.
 
 ### Limits and network behavior
 
