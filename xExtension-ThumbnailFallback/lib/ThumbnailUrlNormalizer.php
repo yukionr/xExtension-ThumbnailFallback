@@ -42,11 +42,11 @@ final class ThumbnailUrlNormalizer
 			return null;
 		}
 
-		if (preg_match('~<img\b[^>]*\bsrc\s*=\s*(["\'])(.*?)\1~is', $html, $matches) !== 1) {
+		if (preg_match(self::imageAttributePattern('img', 'src'), $html, $matches) !== 1) {
 			return null;
 		}
 
-		$url = self::resolveUrl($matches[2], $baseUrl);
+		$url = self::resolveUrl($matches[3], $baseUrl);
 		return self::isHttpUrl($url) ? $url : null;
 	}
 
@@ -57,7 +57,7 @@ final class ThumbnailUrlNormalizer
 		}
 
 		$normalizedHtml = preg_replace_callback(
-			'~(<(?:img|source)\b[^>]*\bsrc\s*=\s*)(["\'])(.*?)\2~is',
+			self::imageAttributePattern('(?:img|source)', 'src'),
 			static function (array $matches) use ($baseUrl): string {
 				return $matches[1] . $matches[2]
 					. self::resolveUrl($matches[3], $baseUrl)
@@ -71,7 +71,7 @@ final class ThumbnailUrlNormalizer
 		$html = $normalizedHtml;
 
 		$normalizedHtml = preg_replace_callback(
-			'~(<(?:img|source)\b[^>]*\bsrcset\s*=\s*)(["\'])(.*?)\2~is',
+			self::imageAttributePattern('(?:img|source)', 'srcset'),
 			static function (array $matches) use ($baseUrl): string {
 				$candidates = preg_split('/\s*,\s*/', trim($matches[3])) ?: [];
 				$normalized = [];
@@ -91,6 +91,12 @@ final class ThumbnailUrlNormalizer
 			$html,
 		);
 		return $normalizedHtml ?? $html;
+	}
+
+	private static function imageAttributePattern(string $tags, string $attribute): string
+	{
+		return '~(<' . $tags . '\b[^>]*\s' . preg_quote($attribute, '~')
+			. '\s*=\s*)(["\'])(.*?)\2~is';
 	}
 
 	private static function resolveUrl(string $url, string $baseUrl): string
@@ -132,6 +138,9 @@ final class ThumbnailUrlNormalizer
 
 		if ($url === '') {
 			$path = $base['path'] ?? '/';
+			if ($queryPosition === false && isset($base['query'])) {
+				$query = '?' . $base['query'];
+			}
 		} elseif (str_starts_with($url, '/')) {
 			$path = $url;
 		} else {
@@ -153,23 +162,25 @@ final class ThumbnailUrlNormalizer
 
 	private static function normalizePath(string $path): string
 	{
-		$leadingSlash = str_starts_with($path, '/');
 		$segments = explode('/', $path);
 		$normalized = [];
 
-		foreach ($segments as $segment) {
-			if ($segment === '' || $segment === '.') {
-				continue;
-			}
+		foreach ($segments as $index => $segment) {
 			if ($segment === '..') {
-				array_pop($normalized);
+				if (count($normalized) > 1) {
+					array_pop($normalized);
+				}
+			}
+			if ($segment === '.' || $segment === '..') {
+				if ($index === count($segments) - 1) {
+					$normalized[] = '';
+				}
 				continue;
 			}
 			$normalized[] = $segment;
 		}
 
-		return ($leadingSlash ? '/' : '') . implode('/', $normalized)
-			. (str_ends_with($path, '/') ? '/' : '');
+		return implode('/', $normalized);
 	}
 
 	private static function isHttpUrl(string $url): bool

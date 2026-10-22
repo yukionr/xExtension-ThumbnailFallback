@@ -49,6 +49,66 @@ assertSameValue(
 	'Preserve embedded data URLs',
 );
 
+$baseUrl = 'https://publisher.example.test/articles/story.html?edition=1';
+foreach ([
+	'/' => '/',
+	'/images//cover.jpg' => '/images//cover.jpg',
+	'./' => '/articles/',
+	'.' => '/articles/',
+	'..' => '/',
+	'../../..' => '/',
+	'/images/.' => '/images/',
+	'/images/..' => '/',
+	'/images//../cover.jpg' => '/images/cover.jpg',
+	'#cover' => '/articles/story.html?edition=1#cover',
+	'?size=large#cover' => '/articles/story.html?size=large#cover',
+	'?' => '/articles/story.html?',
+	'cover.jpg' => '/articles/cover.jpg',
+] as $relative => $path) {
+	$expected = 'https://publisher.example.test' . $path;
+	assertSameValue(
+		'<img src="' . $expected . '">',
+		ThumbnailUrlNormalizer::normalizeHtml('<img src="' . $relative . '">', $baseUrl),
+		'Resolve path and query components: ' . $relative,
+	);
+	assertSameValue(
+		$expected,
+		ThumbnailUrlNormalizer::firstOgImageUrl('<meta property="og:image" content="' . $relative . '">', $baseUrl) ?? '',
+		'Resolve Open Graph URL components: ' . $relative,
+	);
+}
+
+foreach (['img', 'source'] as $tag) {
+	$html = '<' . $tag . ' data-src="/lazy.jpg" data-srcset="/lazy.jpg 1x">';
+	assertSameValue($html, ThumbnailUrlNormalizer::normalizeHtml($html, $baseUrl), 'Preserve custom image attributes');
+	assertSameValue(
+		'<' . $tag . ' src="https://publisher.example.test/cover.jpg" data-src="/lazy.jpg">',
+		ThumbnailUrlNormalizer::normalizeHtml('<' . $tag . ' src="/cover.jpg" data-src="/lazy.jpg">', $baseUrl),
+		'Normalize src even when followed by data-src',
+	);
+	assertSameValue(
+		'<' . $tag . ' srcset="https://publisher.example.test/small.jpg 1x, https://publisher.example.test/large.jpg 2x" data-srcset="/lazy.jpg 1x">',
+		ThumbnailUrlNormalizer::normalizeHtml('<' . $tag . ' srcset="/small.jpg 1x, /large.jpg 2x" data-srcset="/lazy.jpg 1x">', $baseUrl),
+		'Normalize srcset even when followed by data-srcset',
+	);
+}
+if (ThumbnailUrlNormalizer::firstImageUrl('<img data-src="/lazy.jpg">', $baseUrl) !== null) {
+	throw new RuntimeException('Do not select data-src as a content thumbnail');
+}
+assertSameValue(
+	'https://publisher.example.test/cover.jpg',
+	ThumbnailUrlNormalizer::firstImageUrl('<img src="/cover.jpg" data-src="/lazy.jpg">', $baseUrl) ?? '',
+	'Select src instead of a later data-src attribute',
+);
+assertSameValue(
+	"<IMG SRC = 'https://publisher.example.test/cover.jpg'>",
+	ThumbnailUrlNormalizer::normalizeHtml("<IMG SRC = '/cover.jpg'>", $baseUrl),
+	'Preserve support for single quotes, whitespace, and uppercase attributes',
+);
+if (ThumbnailUrlNormalizer::firstImageUrl('<img src="data:image/gif;base64,AAAA"><img src="/cover.jpg">', $baseUrl) !== null) {
+	throw new RuntimeException('Preserve the first matching image selection policy');
+}
+
 final class Minz_HookType
 {
 	public const EntryBeforeDisplay = 'entry_before_display';
@@ -177,6 +237,13 @@ if ($entryWithOgImage->thumbnail() !== ['url' => 'https://publisher.example.test
 }
 if (FreshRSS_http_Util::$calls !== 1) {
 	throw new RuntimeException('Expected article pages to be fetched only when a thumbnail is missing');
+}
+
+$lazyEntry = new FreshRSS_Entry($baseUrl, '<img data-src="/lazy.jpg">');
+$extension->normalizeEntry($lazyEntry);
+if ($lazyEntry->thumbnail() !== ['url' => 'https://publisher.example.test/article-image.jpg']
+	|| FreshRSS_http_Util::$calls !== 2) {
+	throw new RuntimeException('Use Open Graph fallback when only data-src is present');
 }
 
 echo "ok\n";

@@ -74,20 +74,27 @@ apply the fallback to existing articles; reimporting the feed is unnecessary.
 
 ## Development
 
-With PHP available, run these commands from the repository root:
+PHP が利用できる環境では、リポジトリのルートで次を実行します。
 
 ```sh
-php tests/run.php
-php -l tests/run.php
-php -l xExtension-ThumbnailFallback/extension.php
-php -l xExtension-ThumbnailFallback/lib/ThumbnailUrlNormalizer.php
+sh tests/check.sh
 ```
 
-The standalone test runner prints `ok` on success. It covers relative URLs,
-`srcset`, preservation of absolute and data URLs, hook registration, content
-thumbnails, existing thumbnails, and Open Graph fallback. FreshRSS classes and
-HTTP responses are stubbed; the suite does not verify a live FreshRSS instance
-or real network requests.
+ホストに PHP がない場合は、rootless Podman で同じ検証を実行できます。
+
+```sh
+sh tests/container.sh
+```
+
+FreshRSS 1.30.4 の公式イメージを digest で固定し、初回だけ必要に応じて取得します。
+検証コンテナはネットワーク無効、ファイルシステムとリポジトリは読み取り専用です。
+FreshRSS サーバーは起動せず、イメージ内の PHP CLI を使用します。PHP 8.4.27 で
+構文検証とテストの成功を確認しています。
+
+テストは成功時に `ok` を出力します。相対 URL、パス区切りとクエリの保持、`srcset`、
+`data-src` などのカスタム属性の保持、絶対 URL と data URL の保持、hook 登録、
+本文・既存サムネイル・Open Graph のフォールバックを確認します。FreshRSS のクラスと
+HTTP 応答はスタブであり、FreshRSS 実機や実ネットワークとの統合は検証しません。
 
 See [Contributing](CONTRIBUTING.md) for reporting issues and submitting changes.
 
