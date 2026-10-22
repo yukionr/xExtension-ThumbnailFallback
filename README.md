@@ -71,30 +71,36 @@ apply the fallback to existing articles; reimporting the feed is unnecessary.
 - Content fallback examines the first matching `<img src>` only. It does not
   search later images if that URL is unusable, or select thumbnails from
   `srcset` alone.
+- Custom attributes such as `data-src` and `data-srcset` are left unchanged and
+  are not used to select thumbnails.
 
 ## Development
 
-PHP が利用できる環境では、リポジトリのルートで次を実行します。
+With PHP CLI installed, run the checks from the repository root:
 
 ```sh
 sh tests/check.sh
 ```
 
-ホストに PHP がない場合は、rootless Podman で同じ検証を実行できます。
+To run the same checks without installing PHP locally, use a working rootless
+Podman installation:
 
 ```sh
 sh tests/container.sh
 ```
 
-FreshRSS 1.30.4 の公式イメージを digest で固定し、初回だけ必要に応じて取得します。
-検証コンテナはネットワーク無効、ファイルシステムとリポジトリは読み取り専用です。
-FreshRSS サーバーは起動せず、イメージ内の PHP CLI を使用します。PHP 8.4.27 で
-構文検証とテストの成功を確認しています。
+The [container runner](tests/container.sh) uses PHP 8.4.27 from the official
+FreshRSS 1.30.4 image, pinned by digest. Podman downloads the image if it is
+missing, which requires network access. The tests run with networking disabled
+and both the container filesystem and repository mounted read-only. The runner
+uses PHP CLI without starting the FreshRSS server.
 
-テストは成功時に `ok` を出力します。相対 URL、パス区切りとクエリの保持、`srcset`、
-`data-src` などのカスタム属性の保持、絶対 URL と data URL の保持、hook 登録、
-本文・既存サムネイル・Open Graph のフォールバックを確認します。FreshRSS のクラスと
-HTTP 応答はスタブであり、FreshRSS 実機や実ネットワークとの統合は検証しません。
+Both commands check PHP syntax and run [the test suite](tests/run.php), which
+prints `ok` on success. It covers relative URLs, path separators and query
+strings, `srcset`, custom attributes, preservation of absolute and data URLs,
+hook registration, content thumbnails, existing thumbnails, and Open Graph
+fallback. FreshRSS classes and HTTP responses are stubbed; the suite does not
+verify a live FreshRSS instance or real network requests.
 
 See [Contributing](CONTRIBUTING.md) for reporting issues and submitting changes.
 
